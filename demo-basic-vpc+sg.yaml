@@ -1,0 +1,395 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+
+Description: 'VPC, Subnets, SecurityGroups, S3 Bucket'
+
+
+
+
+#------------------------------------------------------------------------------
+Parameters:
+
+
+  VPCSubnetCIDR:
+    Description: CIDR for the VPC
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.100.0.0/20
+    ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x
+
+  SubnetAZ1CIDR:
+    Description: AZ1 - CIDR for the Subnet
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.100.1.0/24
+    ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x
+
+
+
+  SubnetAZ2CIDR:
+    Description: AZ2 - CIDR for the Subnet
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.100.2.0/24
+    ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x
+
+
+
+  SubnetAZ3CIDR:
+    Description: AZ3 - CIDR for the Subnet
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.100.3.0/24
+    ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x
+
+  S3BucketName:
+    Description: Assign a name for the S3 bucket that will store the Nginx Configuration
+    Type: String
+    MinLength: 6
+    MaxLength: 30
+    Default: nginx-config
+    
+
+#------------------------------------------------------------------------------
+Resources:
+
+
+
+# VPC: Virtual Private Cloud
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCSubnetCIDR
+      EnableDnsHostnames: true
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo VPC'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+# Gateway to the Internet
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn:
+      - VPC
+    Properties:
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo InternetGateway'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+# Attach the Internet Gateway to the VPC
+  InternetGatewayAttachVPC:
+    DependsOn:
+      - VPC
+      - InternetGateway
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo Public Route Table'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+
+  RoutePublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+#------------------------------------------------------------------------------
+#  Subnets
+  SubnetAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: SubnetAZ1CIDR
+      AvailabilityZone:
+        Fn::Select:
+          - '0'
+          - Fn::GetAZs: ''
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo Public AZ1'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+  SubnetAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: SubnetAZ2CIDR
+      AvailabilityZone:
+        Fn::Select:
+          - '1'
+          - Fn::GetAZs: ''
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo Public AZ2'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+  SubnetAZ3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: SubnetAZ3CIDR
+      AvailabilityZone:
+        Fn::Select:
+          - '2'
+          - Fn::GetAZs: ''
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo Public AZ3'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+#------------------------------------------------------------------------------
+
+
+#  Network ACL
+  NACL:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo Public NACL'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+# Inbound  NACLs
+
+  SubnetInboundNACLEntry:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId:
+        Ref: NACL
+
+
+# Outbound  NACLs
+  SubnetOutboundNACLEntry:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId:
+        Ref: NACL
+
+#------------------------------------------------------------------------------
+# Subnet Associations
+
+# Public Subnet AZ1 Route Association: Assign  Subnet to  Route Table
+  SubnetAZ1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetAZ1
+      RouteTableId: !Ref RouteTable
+
+#  Subnet AZ2 Route Association: Assign  Subnet to  Route Table
+  SubnetAZ2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetAZ2
+      RouteTableId: !Ref RouteTable
+
+#  Subnet AZ3 Route Association: Assign  Subnet to  Route Table
+  SubnetAZ3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetAZ3
+      RouteTableId: !Ref RouteTable
+
+# NACL: Associate  AZ1 NACL with  Subnet
+  SubnetAZ1NetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetAZ1
+      NetworkAclId: !Ref NACL
+
+# NACL: Associate  AZ2 NACL with  Subnet
+  SubnetAZ2NetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetAZ2
+      NetworkAclId: !Ref NACL
+
+# NACL: Associate  AZ3 NACL with  Subnet
+  SubnetAZ3NetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetAZ3
+      NetworkAclId: !Ref NACL
+
+#------------------------------------------------------------------------------
+# Security Groups
+  SecurityGroupSSH:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: secgrp-ssh
+      GroupDescription: 'Security Group for inbound SSH'
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo SSH Inbound'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+  SecurityGroupSSHIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroupSSH
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 10.100.0.0/20
+
+  SecurityGroupSSHIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroupSSH
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 1.2.3.4/32 # replace with your 1st IP e.g. home
+
+  SecurityGroupSSHIngress3:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroupSSH
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 5.6.7.8/32 # replace with your 2nd IP e.g. office
+
+  SecurityGroupSSHEgressANY:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref SecurityGroupSSH
+      IpProtocol: -1
+      FromPort: -1
+      ToPort: -1
+      CidrIp: 0.0.0.0/0
+
+  SecurityGroupEC2:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: secgrp-ec2
+      GroupDescription: 'Security Group for EC2'
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo EC2 Security Group'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+  SecurityGroupEC2IngressHTTP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroupEC2
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
+  SecurityGroupEC2IngressHTTPS:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroupEC2
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+  SecurityGroupEC2EgressANY:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref SecurityGroupEC2
+      IpProtocol: -1
+      FromPort: -1
+      ToPort: -1
+      CidrIp: 0.0.0.0/0
+
+#-----------------------------------------------------------------------------
+# Buckets
+
+  ConfigBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      # BucketName: !Ref S3BucketName 
+      BucketName: !Sub "${AWS::StackName}-${S3BucketName}"
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo S3 Bucket'
+        - Key: 'Description'
+          Value: 'Use this for storing your webserver config files'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+
+#------------------------------------------------------------------------------
+# Outputs
+
+Outputs:
+  VPCID:
+    Value: !Ref VPC
+    Description: VPC of the Demo App
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"
+  SubnetAZ1:
+    Value: !Ref SubnetAZ1
+    Description: Subnet ID for AZ1
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetAZ1Id"
+  SubnetAZ2:
+    Value: !Ref SubnetAZ2
+    Description: Subnet ID for AZ2
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetAZ2Id"
+  SubnetAZ3:
+    Value: !Ref SubnetAZ3
+    Description: Subnet ID for AZ3
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetAZ3Id"
+  SecurityGroupEC2:
+    Value: !Ref SecurityGroupEC2
+    Description: EC2 security Group
+    Export:
+      Name: !Sub "${AWS::StackName}-SGEC2"
+  SecurityGroupSSH:
+    Value: !Ref SecurityGroupSSH
+    Description: SSH inbound rules
+    Export:
+      Name: !Sub "${AWS::StackName}-SGSSH"
+  NginxBucket:
+    Description: S3 bucket for Nginx config files & certificates
+    Value: !Ref ConfigBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ConfigBucket"
