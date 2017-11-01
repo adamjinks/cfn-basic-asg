@@ -1,0 +1,139 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+
+Description: 'Network LoadBalancer'
+
+
+Parameters:
+  VPCStackName:
+    Description: Name of the VPC stack we're referencing
+    Type: String
+    Default: demo-vpc
+
+Resources:
+
+  EipAZ1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  EipAZ2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  EipAZ3:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  PublicNLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: network
+      Name: Public-NLB
+      SubnetMappings:
+        - AllocationId: !GetAtt 
+            - EipAZ1
+            - AllocationId
+          SubnetId: 
+            Fn::ImportValue: !Sub "${VPCStackName}-SubnetAZ1Id"
+        - AllocationId: !GetAtt 
+            - EipAZ2
+            - AllocationId
+          SubnetId: 
+            Fn::ImportValue: !Sub "${VPCStackName}-SubnetAZ2Id"
+        - AllocationId: !GetAtt 
+            - EipAZ3
+            - AllocationId
+          SubnetId: 
+            Fn::ImportValue: !Sub "${VPCStackName}-SubnetAZ3Id"
+      Tags:
+        - Key: 'Name'
+          Value: 'Demo Application LoadBalancer'
+        - Key: 'Project'
+          Value: 'Demo Cloudformation Project'
+
+
+
+  ListenerPublicNLB80:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: TargetGroupPublicHTTP
+      LoadBalancerArn:
+        Ref: PublicNLB
+      Port: '80'
+      Protocol: TCP
+
+  ListenerPublicNLB443:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: TargetGroupPublicHTTPS
+      LoadBalancerArn:
+        Ref: PublicNLB
+      Port: '443'
+      Protocol: TCP
+
+# #-------------------------------------------------------------------------------
+
+  TargetGroupPublicHTTP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: Public-Targets
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPort: traffic-port
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Protocol: TCP
+      Port: 80
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '300'
+      VpcId: 
+        Fn::ImportValue: !Sub "${VPCStackName}-VpcId"
+  
+  TargetGroupPublicHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: Public-Targets-SSL
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPort: traffic-port
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Protocol: TCP
+      Port: 443
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '300'
+      VpcId: 
+        Fn::ImportValue: !Sub "${VPCStackName}-VpcId"
+
+
+#Outputs:
+Outputs:
+  PublicNLB:
+    Description: PublicNLB hostname
+    Value: !GetAtt PublicNLB.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicHostName"
+  TargetGroupPort80:
+    Description: Port 80 target group 
+    Value: !Ref TargetGroupPublicHTTP
+    Export:
+      Name: !Sub "${AWS::StackName}-Public-Targets"
+  TargetGroupPort443:
+    Description: Port 443 target group 
+    Value: !Ref TargetGroupPublicHTTPS
+    Export:
+      Name: !Sub "${AWS::StackName}-Public-Targets-SSL"
+

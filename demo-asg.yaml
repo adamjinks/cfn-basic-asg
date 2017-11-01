@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: 'ASG Template: Auto Scaling Group & Launch Configuration'
+
+Mappings:
+  AcctMap:
+    "387331103468" :
+      "AcctName" : "BCAADEV"
+    "474372112003" :
+      "AcctName" : "BCAAPROD"
+
+  AMIMap:
+    us-west-2:
+      "BCAADEV" : "ami-e689729e"
+      "BCAAPROD" : "ami-e689729e"
+    us-east-2:
+      "BCAADEV" : "ami-c5062ba0"
+      "BCAAPROD" : "ami-c5062ba0"
+
+  KeypairMap:
+    us-west-2:
+      "BCAADEV" : "trinimbus-bcaa-dev-us-west-2"
+      "BCAAPROD" : "trinimbus-bcaa-prod-oregon"
+    us-east-2:
+      "BCAADEV" : "dev-paloalto-us-east-2"
+      "BCAAPROD" : "placeholder"
+
+  InstanceSizeMap:
+    t2:
+      "micro" : "t2.micro"
+      "small" : "t2.small"
+      "medium" : "t2.medium"
+      "large" : "t2.large"
+    m4:
+      "small" : "m4.large"
+      "medium" : "m4.xlarge"
+      "large" : "m4.4xlarge"
+
+  ProfileMap:
+    ec2-profile:
+      "BCAADEV" : "RedirectorNginxEC2"
+      "BCAAPROD" : "RedirectorNginxEC2"
+
+Parameters:
+  VPCStackName:
+    Description: Name of the VPC stack we're referencing
+    Type: String
+    Default: Redirector-VPC
+
+  NLBStackName:
+    Description: Name of the NLB stack we're referencing
+    Type: String
+    Default: Redirector-NLB
+
+  Monitoring:
+    Description: Toggle detailed instance monitoring for instances in the ASG.  Set to True for detailed monitoring. Additional fees will apply.
+    Type: String
+    MinLength: '1'
+    MaxLength: '128'
+    Default: false
+
+  InstanceType:
+    Description: Specifies the instance type of the EC2 instances that will be deployed into the ASG.
+    Type: String
+    AllowedValues: 
+      - t2.micro
+      - t2.medium
+      - t2.large
+      - m4.large
+    Default: t2.micro
+
+  DesiredInstanceAmount:
+    Description: Desired number of instances in the ASG.
+    Type: Number
+    Default: 2
+
+  HealthChkGracePeriod:
+    Description: The length of time in seconds after a new EC2 instance comes into service that Auto Scaling starts checking its health.
+    Type: Number
+    Default: 300
+
+  ASGMaxSize:
+    Description: Maximum number of instances to be deployed into the ASG.
+    Type: Number
+    Default: 4
+
+  ASGMinSize:
+    Description: Minimum number of instances to be deployed into the ASG.
+    Type: Number
+    Default: 2
+
+  ASGCooldown:
+    Description: The number of seconds after a scaling activity is completed before any further scaling activities can start.
+    Type: Number
+    Default: 300
+
+  ASGTerminationPolicies:
+    Description: Used to specify the rules that dictate which instances are terminated during scale-in events.
+    Type: String
+    MinLength: '1'
+    MaxLength: '128'
+    Default: Default
+
+  UpdatePolicyMaxBatchSize:
+    Description: Specifies the maximum number of instances that AWS CloudFormation updates at a time.
+    Type: Number
+    Default: 1
+
+  UpdatePolicyMinInstancesInService:
+    Description: Minimum number of instances in service while other instances are being updated.
+    Type: Number
+    Default: 1
+
+  AvailabilityZone:
+    Description: Choose one AZ as the Network Loan Balancer needs exactly ONE IP address
+    Type: String
+    Default: AZ1
+    AllowedValues:
+      - AZ1
+      - AZ2
+      - AZ3
+
+  PublicIP:
+    Description: Set to True if you wish the instances in the ASG to have a public IP.
+    Type: String
+    Default: true
+    AllowedValues: 
+      - true
+      - false
+
+  NginxConfigBucket:
+    Type: String
+    Default: YourBucketName/Prefix
+
+# "${AWS::StackName}-ConfigBucket"
+
+Resources:
+#########################################################################
+# Auto Scaling Group Launch Configuration
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: !Ref PublicIP
+      ImageId: !FindInMap [AMIMap, !Ref "AWS::Region", !FindInMap [AcctMap, !Ref "AWS::AccountId", AcctName ] ]
+      InstanceMonitoring: !Ref Monitoring
+      InstanceType: !Ref InstanceType
+      KeyName: !FindInMap [KeypairMap, !Ref "AWS::Region", !FindInMap [AcctMap, !Ref "AWS::AccountId", AcctName ] ]
+      IamInstanceProfile: !FindInMap [ProfileMap, ec2-profile, !FindInMap [AcctMap, !Ref "AWS::AccountId", AcctName ] ]
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${VPCStackName}-SGEC2"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SGSSH"
+      UserData:
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y nginx
+            chkconfig nginx on
+
+            aws s3 cp s3://${NginxConfigBucket}/nginx.conf /etc/nginx/nginx.conf
+            aws s3 cp s3://${NginxConfigBucket}/www_bcaa_com.crt /etc/pki/tls/certs/www_bcaa_com.crt
+            aws s3 cp s3://${NginxConfigBucket}/www_bcaa_com.key /etc/pki/tls/certs/www_bcaa_com.key
+            chmod 400 /etc/pki/tls/certs/www_bcaa_com.*
+
+            service nginx start
+
+#########################################################################
+# Auto Scaling Group
+
+  ASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: LaunchConfiguration
+    Properties:
+      DesiredCapacity: !Ref DesiredInstanceAmount
+      HealthCheckGracePeriod: !Ref HealthChkGracePeriod
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MaxSize: !Ref ASGMaxSize
+      MinSize: !Ref ASGMinSize
+      Cooldown: !Ref ASGCooldown
+      HealthCheckType: EC2
+      Tags:
+        - Key: 'Name'
+          Value: 'Redirector ASG'
+          PropagateAtLaunch: true
+        - Key: 'Owner'
+          Value: 'Hamed Ettefagh'
+          PropagateAtLaunch: true
+        - Key: 'Creator'
+          Value: 'Alex Georgescu'
+          PropagateAtLaunch: true
+        - Key: 'Team'
+          Value: 'Infrastructure'
+          PropagateAtLaunch: true
+        - Key: 'Dept'
+          Value: 'Business Solutions'
+          PropagateAtLaunch: true
+        - Key: 'Project'
+          Value: 'Cloud Migration'
+          PropagateAtLaunch: true
+        - Key: 'Sub-Project'
+          Value: 'Phoenix'
+          PropagateAtLaunch: true
+        - Key: 'Phase'
+          Value: 'Trinimbus Development'
+          PropagateAtLaunch: true
+      TerminationPolicies:
+        - !Ref ASGTerminationPolicies
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "${VPCStackName}-Subnet${AvailabilityZone}Id"
+      TargetGroupARNs:
+        - Fn::ImportValue: !Sub "${NLBStackName}-Redirector-Targets"
+        - Fn::ImportValue: !Sub "${NLBStackName}-Redirector-Targets-SSL"
+
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: !Ref UpdatePolicyMaxBatchSize
+        MinInstancesInService: !Ref UpdatePolicyMinInstancesInService
+
+
+###############################################################################
