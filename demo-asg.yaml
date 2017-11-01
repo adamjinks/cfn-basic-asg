@@ -3,27 +3,35 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'ASG Template: Auto Scaling Group & Launch Configuration'
 
 Mappings:
-  AcctMap:
-    "387331103468" :
-      "AcctName" : "BCAADEV"
-    "474372112003" :
-      "AcctName" : "BCAAPROD"
 
+  # AcctMap - use this if you wish to easily deploy this stack in
+  # multiple accounts. e.g. PRODUCTION & DEVELOPMENT
+  # If using with one account only, specify and reference only one
+  # account, the other will be ignored.
+  AcctMap:
+    "876543210987" : # customize to your account
+      "AcctName" : "DEVELOPMENT"
+    "123456789012" : # customize to your account
+      "AcctName" : "PRODUCTION"
+
+  # AMIMap - use this to map AMIs in multiple regions and accounts
+  # Only the region is required for public AMIs. Useful if you have
+  # unshared private AMIs in multiple accounts & regions.
   AMIMap:
     us-west-2:
-      "BCAADEV" : "ami-e689729e"
-      "BCAAPROD" : "ami-e689729e"
-    us-east-2:
-      "BCAADEV" : "ami-c5062ba0"
-      "BCAAPROD" : "ami-c5062ba0"
+      "DEVELOPMENT" : "ami-e689729e"
+      "PRODUCTION" : "ami-e689729e"
+    us-east-1:
+      "DEVELOPMENT" : "ami-c5062ba0"
+      "PRODUCTION" : "ami-c5062ba0"
 
   KeypairMap:
     us-west-2:
-      "BCAADEV" : "trinimbus-bcaa-dev-us-west-2"
-      "BCAAPROD" : "trinimbus-bcaa-prod-oregon"
-    us-east-2:
-      "BCAADEV" : "dev-paloalto-us-east-2"
-      "BCAAPROD" : "placeholder"
+      "DEVELOPMENT" : "oregon-dev"
+      "PRODUCTION" : "oregon-prod"
+    us-east-1:
+      "DEVELOPMENT" : "virginia-dev"
+      "PRODUCTION" : "virginia-prod"
 
   InstanceSizeMap:
     t2:
@@ -38,19 +46,19 @@ Mappings:
 
   ProfileMap:
     ec2-profile:
-      "BCAADEV" : "RedirectorNginxEC2"
-      "BCAAPROD" : "RedirectorNginxEC2"
+      "DEVELOPMENT" : "DevEC2Profile"
+      "PRODUCTION"  : "ProdEC2Profile"
 
 Parameters:
   VPCStackName:
     Description: Name of the VPC stack we're referencing
     Type: String
-    Default: Redirector-VPC
+    Default: demo-vpc
 
   NLBStackName:
     Description: Name of the NLB stack we're referencing
     Type: String
-    Default: Redirector-NLB
+    Default: demo-nlb
 
   Monitoring:
     Description: Toggle detailed instance monitoring for instances in the ASG.  Set to True for detailed monitoring. Additional fees will apply.
@@ -72,7 +80,7 @@ Parameters:
   DesiredInstanceAmount:
     Description: Desired number of instances in the ASG.
     Type: Number
-    Default: 2
+    Default: 3
 
   HealthChkGracePeriod:
     Description: The length of time in seconds after a new EC2 instance comes into service that Auto Scaling starts checking its health.
@@ -82,7 +90,7 @@ Parameters:
   ASGMaxSize:
     Description: Maximum number of instances to be deployed into the ASG.
     Type: Number
-    Default: 4
+    Default: 6
 
   ASGMinSize:
     Description: Minimum number of instances to be deployed into the ASG.
@@ -109,7 +117,7 @@ Parameters:
   UpdatePolicyMinInstancesInService:
     Description: Minimum number of instances in service while other instances are being updated.
     Type: Number
-    Default: 1
+    Default: 2
 
   AvailabilityZone:
     Description: Choose one AZ as the Network Loan Balancer needs exactly ONE IP address
@@ -159,9 +167,9 @@ Resources:
             chkconfig nginx on
 
             aws s3 cp s3://${NginxConfigBucket}/nginx.conf /etc/nginx/nginx.conf
-            aws s3 cp s3://${NginxConfigBucket}/www_bcaa_com.crt /etc/pki/tls/certs/www_bcaa_com.crt
-            aws s3 cp s3://${NginxConfigBucket}/www_bcaa_com.key /etc/pki/tls/certs/www_bcaa_com.key
-            chmod 400 /etc/pki/tls/certs/www_bcaa_com.*
+            aws s3 cp s3://${NginxConfigBucket}/demo-server.crt /etc/pki/tls/certs/demo-server.crt
+            aws s3 cp s3://${NginxConfigBucket}/demo-server.key /etc/pki/tls/certs/demo-server.key
+            chmod 400 /etc/pki/tls/certs/demo-server.*
 
             service nginx start
 
@@ -182,27 +190,9 @@ Resources:
       Tags:
         - Key: 'Name'
           Value: 'Redirector ASG'
-          PropagateAtLaunch: true
-        - Key: 'Owner'
-          Value: 'Hamed Ettefagh'
-          PropagateAtLaunch: true
-        - Key: 'Creator'
-          Value: 'Alex Georgescu'
-          PropagateAtLaunch: true
-        - Key: 'Team'
-          Value: 'Infrastructure'
-          PropagateAtLaunch: true
-        - Key: 'Dept'
-          Value: 'Business Solutions'
-          PropagateAtLaunch: true
+
         - Key: 'Project'
           Value: 'Cloud Migration'
-          PropagateAtLaunch: true
-        - Key: 'Sub-Project'
-          Value: 'Phoenix'
-          PropagateAtLaunch: true
-        - Key: 'Phase'
-          Value: 'Trinimbus Development'
           PropagateAtLaunch: true
       TerminationPolicies:
         - !Ref ASGTerminationPolicies
