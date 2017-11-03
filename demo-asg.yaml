@@ -22,8 +22,8 @@ Mappings:
       "DEVELOPMENT" : "ami-e689729e"
       "PRODUCTION" : "ami-e689729e"
     us-east-1:
-      "DEVELOPMENT" : "ami-c5062ba0"
-      "PRODUCTION" : "ami-c5062ba0"
+      "DEVELOPMENT" : "ami-8c1be5f6"
+      "PRODUCTION" : "ami-8c1be5f6"
 
   KeypairMap:
     us-west-2:
