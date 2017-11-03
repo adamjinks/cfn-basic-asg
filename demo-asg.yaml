@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: 'ASG Template: Auto Scaling Group & Launch Configuration'
+Description: 'ASG Template: EC2 Role, Auto Scaling Group & Launch Configuration'
 
 Mappings:
 
@@ -9,9 +9,9 @@ Mappings:
   # If using with one account only, specify and reference only one
   # account, the other will be ignored.
   AcctMap:
-    "876543210987" : # customize to your account
+    "231435876663" : # customize to your account
       "AcctName" : "DEVELOPMENT"
-    "123456789012" : # customize to your account
+    "231435876663" : # customize to your account
       "AcctName" : "PRODUCTION"
 
   # AMIMap - use this to map AMIs in multiple regions and accounts
@@ -24,6 +24,9 @@ Mappings:
     us-east-1:
       "DEVELOPMENT" : "ami-8c1be5f6"
       "PRODUCTION" : "ami-8c1be5f6"
+    us-east-2:
+      "DEVELOPMENT" : "ami-c5062ba0"
+      "PRODUCTION" : "ami-c5062ba0"
 
   KeypairMap:
     us-west-2:
@@ -31,7 +34,10 @@ Mappings:
       "PRODUCTION" : "oregon-prod"
     us-east-1:
       "DEVELOPMENT" : "virginia-dev"
-      "PRODUCTION" : "virginia-prod"
+      "PRODUCTION" : "oregon-prod"
+    us-east-2:
+      "DEVELOPMENT" : "virginia-dev"
+      "PRODUCTION" : "demo-ec2-keypair"
 
   InstanceSizeMap:
     t2:
@@ -44,11 +50,6 @@ Mappings:
       "medium" : "m4.xlarge"
       "large" : "m4.4xlarge"
 
-  ProfileMap:
-    ec2-profile:
-      "DEVELOPMENT" : "DevEC2Profile"
-      "PRODUCTION"  : "ProdEC2Profile"
-
 Parameters:
   VPCStackName:
     Description: Name of the VPC stack we're referencing
@@ -59,6 +60,13 @@ Parameters:
     Description: Name of the NLB stack we're referencing
     Type: String
     Default: demo-nlb
+
+  KeypairName:
+    Description: The name of the keypair for SSH access to your EC2 instances
+    Type: String
+    Default: "demo-ec2-keypair"
+    MinLength: "1"
+    MaxLength: "30"
 
   Monitoring:
     Description: Toggle detailed instance monitoring for instances in the ASG.  Set to True for detailed monitoring. Additional fees will apply.
@@ -119,15 +127,6 @@ Parameters:
     Type: Number
     Default: 2
 
-  AvailabilityZone:
-    Description: Choose one AZ as the Network Loan Balancer needs exactly ONE IP address
-    Type: String
-    Default: AZ1
-    AllowedValues:
-      - AZ1
-      - AZ2
-      - AZ3
-
   PublicIP:
     Description: Set to True if you wish the instances in the ASG to have a public IP.
     Type: String
@@ -144,6 +143,26 @@ Parameters:
 
 Resources:
 #########################################################################
+# IAM Role for EC2 instances to access S3 objects
+  ProdEC2S3Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+
+#########################################################################
 # Auto Scaling Group Launch Configuration
 
   LaunchConfiguration:
@@ -154,7 +173,7 @@ Resources:
       InstanceMonitoring: !Ref Monitoring
       InstanceType: !Ref InstanceType
       KeyName: !FindInMap [KeypairMap, !Ref "AWS::Region", !FindInMap [AcctMap, !Ref "AWS::AccountId", AcctName ] ]
-      IamInstanceProfile: !FindInMap [ProfileMap, ec2-profile, !FindInMap [AcctMap, !Ref "AWS::AccountId", AcctName ] ]
+      IamInstanceProfile: !Ref ProdEC2S3Role
       SecurityGroups:
         - Fn::ImportValue: !Sub "${VPCStackName}-SGEC2"
         - Fn::ImportValue: !Sub "${VPCStackName}-SGSSH"
@@ -197,10 +216,12 @@ Resources:
       TerminationPolicies:
         - !Ref ASGTerminationPolicies
       VPCZoneIdentifier:
-        - Fn::ImportValue: !Sub "${VPCStackName}-Subnet${AvailabilityZone}Id"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetAZ1Id"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetAZ2Id"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetAZ3Id"
       TargetGroupARNs:
-        - Fn::ImportValue: !Sub "${NLBStackName}-Redirector-Targets"
-        - Fn::ImportValue: !Sub "${NLBStackName}-Redirector-Targets-SSL"
+        - Fn::ImportValue: !Sub "${NLBStackName}-Public-Targets"
+        - Fn::ImportValue: !Sub "${NLBStackName}-Public-Targets-SSL"
 
     UpdatePolicy:
       AutoScalingRollingUpdate:
@@ -209,3 +230,9 @@ Resources:
 
 
 ###############################################################################
+Outputs:
+  EC2Role:
+    Value: !Ref ProdEC2S3Role
+    Description: Role for EC2 instances to access S3
+    Export:
+      Name: !Sub "${AWS::StackName}-EC2Role"
