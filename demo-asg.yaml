@@ -9,7 +9,7 @@ Mappings:
   # If using with one account only, specify and reference only one
   # account, the other will be ignored.
   AcctMap:
-    "231435876663" : # customize to your account
+    "452644920012" : # customize to your account
       "AcctName" : "DEVELOPMENT"
     "231435876663" : # customize to your account
       "AcctName" : "PRODUCTION"
@@ -36,7 +36,7 @@ Mappings:
       "DEVELOPMENT" : "virginia-dev"
       "PRODUCTION" : "oregon-prod"
     us-east-2:
-      "DEVELOPMENT" : "virginia-dev"
+      "DEVELOPMENT" : "demo-ec2-keypair"
       "PRODUCTION" : "demo-ec2-keypair"
 
   InstanceSizeMap:
@@ -168,6 +168,7 @@ Resources:
   LaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
+      DependsOn: !Ref ProdEC2S3Role
       AssociatePublicIpAddress: !Ref PublicIP
       ImageId: !FindInMap [AMIMap, !Ref "AWS::Region", !FindInMap [AcctMap, !Ref "AWS::AccountId", AcctName ] ]
       InstanceMonitoring: !Ref Monitoring
@@ -208,10 +209,10 @@ Resources:
       HealthCheckType: EC2
       Tags:
         - Key: 'Name'
-          Value: 'Redirector ASG'
+          Value: 'Demo ASG'
 
         - Key: 'Project'
-          Value: 'Cloud Migration'
+          Value: 'Demo CloudFormation Project'
           PropagateAtLaunch: true
       TerminationPolicies:
         - !Ref ASGTerminationPolicies
