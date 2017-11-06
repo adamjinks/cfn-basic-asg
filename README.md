@@ -9,8 +9,10 @@ AWS CFN Basic ASG + LB + VPC
 Instructions
 ---------------
 
- 1. Go to Cloudformation console and create your VPC stack using 
+ 1. Open AWS Cloudformation console 
+ 2. Create your VPC stack using 'demo-vpc.yaml'
+ 3. Create your Network Load Balancer stack using 'demo-nlb
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTg5NzI2NzA2XX0=
+eyJoaXN0b3J5IjpbLTE5Mjg2ODI2NjhdfQ==
 -->
