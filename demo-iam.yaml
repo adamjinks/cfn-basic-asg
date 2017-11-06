@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: 'IAM EC2 role and profile'
+
+Mappings:
+
+  # AcctMap - use this if you wish to easily deploy this stack in
+  # multiple accounts. e.g. PRODUCTION & DEVELOPMENT
+  # If using with one account only, specify and reference only one
+  # account, the other will be ignored.
+  AcctMap:
+    "876543210987" : # <= EDIT_THIS
+      "AcctName" : "DEVELOPMENT"
+    "123456789012" : # <= EDIT_THIS
+      "AcctName" : "PRODUCTION"
+
+
+Resources:
+#########################################################################
+# Role for EC2 instances to read from S3 buckets
+
+  EC2S3Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+  EC2S3Profile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref EC2S3Role
+
+#########################################################################
+Outputs:
+  EC2S3Role:
+    Value: !Ref EC2S3Role
+    Description: Role for EC2 instances to access S3
+    Export:
+      Name: !Sub "${AWS::StackName}-EC2S3Role"
+
+  EC2S3Profile:
+    Value: !Ref EC2S3Profile
+    Description: Profile for EC2 instances to access S3
+    Export:
+      Name: !Sub "${AWS::StackName}-EC2S3Profile"
