@@ -13,8 +13,8 @@ Instructions
  2. Create your VPC stack using 'demo-vpc.yaml'
  3. Create a Network Load Balancer stack using 'demo-nlb.yaml' or create an Application Load Balancer stack using 'demo-alb.yaml'
  4. Create the EC2 IAM role stack using 'demo-iam.yaml'
- 5. Open EC2 
+ 5. Open EC2 console and create a keypair named 
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTgwOTYyMDY0N119
+eyJoaXN0b3J5IjpbMTc1Mzk3MzUyOF19
 -->
