@@ -1,7 +1,10 @@
 AWS CFN Basic ASG + LB + VPC
 =========================
 
- - demo-vpc.yaml
+ - demo-vpc.yaml - basic VPC 
+ - demo-nlb.yaml - generic Network Load Balancer
+ - demo-iam - role for EC2 instances to access S3
+ - demo-as
 
 Instructions
 ---------------
@@ -9,5 +12,5 @@ Instructions
  1. Go to Cloudformation console and create your VPC stack using 
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbOTYyNjQ1NjQ5XX0=
+eyJoaXN0b3J5IjpbMTM1OTEwNDk0M119
 -->
