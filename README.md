@@ -11,8 +11,8 @@ Instructions
 
  1. Open AWS Cloudformation console 
  2. Create your VPC stack using 'demo-vpc.yaml'
- 3. Create your Network Load Balancer stack using 'demo-nlb.y
+ 3. Create your Network Load Balancer stack using 'demo-nlb.yaml'
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMjU3MjEzMjFdfQ==
+eyJoaXN0b3J5IjpbLTE0MTA2NzI4NjJdfQ==
 -->
