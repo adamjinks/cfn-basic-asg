@@ -11,8 +11,10 @@ Instructions
 
  1. Open AWS Cloudformation console 
  2. Create your VPC stack using 'demo-vpc.yaml'
- 3. Create your Network Load Balancer stack using 'demo-nlb.yaml'
+ 3. Create a Network Load Balancer stack using 'demo-nlb.yaml' or create an Application Load Balancer stack using 'demo-alb.yaml'
+ 4. Create the EC2 IAM role stack using 'demo-iam.yaml'
+ 5. 
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE0MTA2NzI4NjJdfQ==
+eyJoaXN0b3J5IjpbLTE1NDY4MjE5NjNdfQ==
 -->
