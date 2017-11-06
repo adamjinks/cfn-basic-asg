@@ -6,9 +6,8 @@ AWS CFN Basic ASG + LB + VPC
 Instructions
 ---------------
 
-
-
+ 1. List item
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbNzM2ODY5OTM2XX0=
+eyJoaXN0b3J5IjpbLTE3NzUwNDE3MDBdfQ==
 -->
